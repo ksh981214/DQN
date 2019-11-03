@@ -5,51 +5,53 @@ import random
 class ReplayBuffer(object):
     
     def __init__(self):
-        self.states = []
-        self.actions = []
-        self.rewards = []
-        #self.states_after = []
-        self.dones = []
-        #self.discounted_returns = []
-        
         self.buffer_size = config.REPLAY_BUFFER_SIZE
+        self.state_shape = [config.width, config.height, config.history_length]
         
-    #def add_experience(self, state, action, reward, state_after, discounted_return):
-    #def add_experience(self, state, action, reward, state_after, done):
+        self.next_idx = 0
+        self.num_in_buffer = 0
+        self.states = np.empty([self.buffer_size] + self.state_shape, dtype=np.float32)
+        self.actions = np.empty([self.buffer_size], dtype=np.int32)
+        self.rewards = np.empty([self.buffer_size], dtype=np.float32)
+        self.dones = np.empty([self.buffer_size], dtype=np.bool)
+        
+        #print(self.states.shape)
+        #print(self.actions.shape)
+        #print(self.rewards.shape)
+        #print(self.dones.shape)
+        
+        
     def add_experience(self, state, action, reward, done):
-        self.states.append(state)
-        self.actions.append(action)
-        self.rewards.append(reward)
-        #self.states_after.append(state_after)
-        self.dones.append(done) 
-        #self.discounted_returns += discounted_return
-        if len(self.states) > self.buffer_size:
-            self.delete_old_experiences()
         
-    
-    def delete_old_experiences(self):
-        self.states = self.states[-self.buffer_size:]
-        self.actions = self.actions[-self.buffer_size:]
-        self.rewards = self.rewards[-self.buffer_size:]
-        #self.states_after = self.states_after[-self.buffer_size:]
-        self.dones = self.dones[-self.buffer_size:]
+        self.states[self.next_idx] = state
+        self.actions[self.next_idx] = action
+        self.rewards[self.next_idx] = reward
+        self.dones[self.next_idx] = done
+        
+        self.next_idx = (self.next_idx + 1) % self.buffer_size
+        self.num_in_buffer = min(self.buffer_size, self.num_in_buffer + 1) 
+        
+        #if self.num_in_buffer % 1000 == 0:
+        #    print(self.num_in_buffer)
 
     def sample_batch(self, batch_size):
-        state, action, reward, state_after, done = [],[],[],[],[]
-        #state, action, reward, done = [],[],[],[]
         
-        rands = np.arange(len(self.states)-1) #state_after때문에
+        rands = np.arange(self.num_in_buffer-1) #state_after때문에
+        
         np.random.shuffle(rands)
         rands = rands[:batch_size]
         
-        for i in rands:
-            state.append(self.states[i])
-            action.append(self.actions[i])
-            reward.append(self.rewards[i])
-            state_after.append(self.states[i+1])
-            done.append(self.dones[i])
-            #terminal.append(self.discounted_returns[i])
-        #print((np.array(state_after)).shape)
-        return np.array(state),np.array(action),np.array(reward),np.array(state_after),np.array(done)
-        #return np.array(state),np.array(action),np.array(reward),np.array(state_after),np.array(done)
-            
+        for i, num in enumerate(rands):
+            if self.dones[num]:
+                rands[i] -= 1
+        
+        rands_add_1 = np.add(rands,1)    
+        
+        
+        state = self.states[rands]
+        action = self.actions[rands]
+        reward = self.rewards[rands]
+        state_after = self.states[rands_add_1]
+        done = np.array([1.0 if self.dones[num] else 0.0 for num in rands],dtype=np.float32)
+        
+        return state,action,reward,state_after,done

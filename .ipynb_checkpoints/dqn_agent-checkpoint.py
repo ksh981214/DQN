@@ -8,7 +8,8 @@ import numpy as np
 
 #main
 from utils.preprocess import greyscale
-from utils.wrappers import PreproWrapper, MaxAndSkipEnv
+#from utils.wrappers import PreproWrapper, MaxAndSkipEnv
+from utils.wrappers import wrap_deepmind
 from replay_buffer import ReplayBuffer
 from scheduler import e_scheduler
 from scheduler import lr_scheduler
@@ -58,7 +59,7 @@ class DQNAgent(object):
             self.Q = layers.fully_connected(inputs = model,
                                                  num_outputs = self.num_actions,
                                                  activation_fn = None, scope='Q_values')
-            self.Q_action = tf.argmax(self.Q, dimension = 1)
+            #self.Q_action = tf.argmax(self.Q, dimension = 1)
     def build_target_network(self):
         with tf.variable_scope('target_network'):
             self.target_state = tf.placeholder(dtype = tf.float32, shape=(None, self.width, self.height, 1 * self.history_length), name = 'state')
@@ -113,16 +114,22 @@ class DQNAgent(object):
         action_one_hot = tf.one_hot(self.action, self.num_actions, 1.0,0.0, name='acion_one_hot')
         q_of_action = tf.reduce_sum(self.Q * action_one_hot, reduction_indices=1, name='q_of_action')
         
-        #self.delta = tf.square(self.target_q_t - q_of_action)
-        self.loss = tf.reduce_mean(tf.square(self.target_Q_p - q_of_action), name='loss')
+        
+        self.delta = self.target_Q_p - q_of_action
+        #self.loss = tf.reduce_mean(tf.square(self.target_Q_p - q_of_action), name='loss')
+        self.loss = tf.reduce_mean(tf.where(tf.abs(self.delta)<1.0,tf.square(self.delta)*0.5, tf.abs(self.delta)-0.5), name='loss')
         
         self.optimizer = tf.train.AdamOptimizer(learning_rate=self.lr)
+        opt = self.optimizer
+        opt = tf.contrib.estimator.clip_gradients_by_norm(opt,10.0)
+        
         self.train_step = self.optimizer.minimize(self.loss)
         
     def predict_action(self, state):
         action_distribution = self.sess.run(
         self.Q, feed_dict={self.state:[state]})[0]
-        
+        #print(action_distribution)
+        #print("action_dist",action_distribution)
         action = np.argmax(action_distribution)
         
         return action
@@ -135,21 +142,14 @@ class DQNAgent(object):
                 #그 전의 과거를 앞으로 한 칸씩 당겨오고 
                 full_state[:,:,i] = past_state[:,:,i+1]
             #현재 들어온 프레임을 맨 뒤에 삽입
-#             full_state[:,:,-1] = imresize(to_greyscale(frame), (self.width, self.height))/255.0
-            #full_state[:,:,-1] = imresize(frame, (self.width, self.height))/255.0
-            #print(len(frame[0]))
             full_state[:,:,-1] = np.squeeze(frame)
             
-                
-        else:
-            all_frames = past_frames + [np.squeeze(frame)]
             
-            for i, frame_f in enumerate(all_frames):
-#                 full_state[:,:,-1] = imresize(to_greyscale(frame), (self.width, self.height))/255.0
-                #full_state[:,:,i] = imresize(frame, (self.width, self.height))/255.0
-                full_state[:,:,i] = np.squeeze(frame)
-            #print(len(frame[0]))
-            full_state = full_state.astype('float32')
+                
+        else: 
+            #단순히 그 전 화면(80,80,3)과 현재 화면(80,80,1)을 concat해서 내보내면된다. --> (80,80,4)
+            full_state = np.concatenate((past_frames,frame), axis=2)       
+            #full_state = full_state.astype('uint8')
         
         return full_state
         
@@ -158,9 +158,13 @@ class DQNAgent(object):
 def main(argv):
     
     env = gym.make(config.game_name)
-    env = MaxAndSkipEnv(env, skip=config.skip_frame)
-    env = PreproWrapper(env, prepro=greyscale, shape=(80, 80, 1),overwrite_render=True)
+    #env = MaxAndSkipEnv(env, skip=config.skip_frame)
+    #env = PreproWrapper(env, prepro=greyscale, shape=(80, 80, 1),overwrite_render=True)
+    env = wrap_deepmind(env, config.episode_life, config.preprocess, config.max_and_skip,
+                        config.clip_rewards, config.no_op_reset, config.scale)
+    
     num_actions=env.action_space.n
+    
     
     #with tf.Session() as sess:
     sess = tf.Session()
@@ -178,7 +182,7 @@ def main(argv):
     saver = tf.train.Saver()
     tf.summary.scalar('avg.reward/ep', tf.reduce_mean(rewards))
     
-    writer = tf.summary.FileWriter('logs_2', sess.graph)
+    writer = tf.summary.FileWriter('logs_4', sess.graph)
     summary_merged = tf.summary.merge_all()
     
     episode_rewards = [] #에피소드당 리워드 저장
@@ -200,12 +204,10 @@ def main(argv):
         
         frame = env.reset() #한 순간의 화면 (쌓이기 전) 84 x 84 x 1 , np.array
 
-        #past_frames = np.zeros((frame.shape[0],frame.shape[1], agent.history_length - 1))
-        past_frames = []
-        for i in range(agent.history_length - 1):
-            past_frames.append(list(np.squeeze(frame))) # width x weight x 1 이라서 1인 차원을 삭제한 후 list로 변경하고 past_frames에 append
+        #맨 처음 frame을 받아올때는 past_frames이 존재하지않으므로, (80x80)의 0인 행렬을 받아서 초기화
 
-        
+        past_frames = np.zeros((config.height,config.width,agent.history_length - 1))
+
         #state --> history length만큼 쌓임
         state = agent.process_state_into_stacked_frames(frame, past_frames, past_state=None)
         
@@ -215,33 +217,38 @@ def main(argv):
                 action = env.action_space.sample()
             else:
                 action = agent.predict_action(state)
-            
+            #action = agent.predict_action(state)
+            #print(action)
             time_step += 1
             
             frame_after, reward, done, info = env.step(action)
             
-            #새로 생긴 frame을 과거 state에 더해줌.
-            state_after = agent.process_state_into_stacked_frames(frame_after, past_frames, past_state = state)
-            
-            past_frames.append(frame_after) #이제 history length만큼 됨.
-            past_frames = past_frames[-config.history_length:]
-            
-            #replay_buffer.add_experience(state, action, reward, state_after, done)
             replay_buffer.add_experience(state, action, reward, done)
-            
-            state = state_after
-            
+            #print(reward)
+            if not done: #+21 or -21
+                #print(total_reward)
+                #새로 생긴 frame을 과거 state에 더해줌.
+                state_after = agent.process_state_into_stacked_frames(frame_after, past_frames, past_state = state)
+                
+                #past_frames.append(frame_after) #이제 history length만큼 됨.
+                past_frames = np.concatenate((past_frames, frame_after), axis=2)
+                past_frames = past_frames[:,:,1:]
+                #print(past_frames.shape)
+                
+                state = state_after
+            #replay_buffer.add_experience(state, action, reward, state_after, done)
+#             else:
+#                 print("끝났당!",total_reward)
             total_reward += reward
             
+            #학습부분
             if time_step > config.REPLAY_START_SIZE and time_step % config.LEARNING_FREQ == 0:
                 e.update(time_step)
                 lr.update(time_step)
-                #dqn.train(lr.get())
+
                 b_state, b_action, b_reward, b_state_after, b_done = replay_buffer.sample_batch(config.BATCH_SIZE)
                 
                 Q_of_state_after = agent.target_Q.eval(feed_dict={agent.target_state: b_state_after}, session = agent.sess)
-                
-                #max_Q_of_state_after = np.max(Q_of_state_after, axis=1)
                 
                 target_Q_p = []
                 for i in range(config.BATCH_SIZE):
@@ -268,7 +275,7 @@ def main(argv):
                 total_reward_list =[]
         
             if time_step % config.MODEL_RECORD_FREQ == 0:
-                saver.save(sess, 'model/dqn.ckpt', global_step = time_step)
+                saver.save(sess, 'model_4/dqn.ckpt', global_step = time_step)
         
         
         #학습과 상관 x
@@ -278,20 +285,7 @@ def main(argv):
             print('episode : %d 점수: %d' % (episode, total_reward))
         
         total_reward_list.append(total_reward)
-        #print(time_step)
-#         if time_step % config.REWARD_RECORD_FREQ == 0:
-#             #print("로그를 저장합니다.")
-#             summary = sess.run(summary_merged,
-#                               feed_dict = {rewards: total_reward_list})
-#             writer.add_summary(summary, time_step)
-#             total_reward_list =[]
-        
-#         if time_step % config.MODEL_RECORD_FREQ == 0:
-#             saver.save(sess, 'model/dqn.ckpt', global_step = time_step)
+
             
-            
-# def main(_):
-#     agent_play_and_train()
-#     tf.app.run()
 if __name__ == '__main__':
     tf.app.run()
