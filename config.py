@@ -21,7 +21,7 @@ class config():
     #main
     skip_frame=4
     MAX_TIME_STEPS = 2500000
-    REPLAY_START_SIZE = 10000
+    REPLAY_START_SIZE = 5000
     
     target_UPDATE_FREQ = 10000
     LEARNING_FREQ = 4
