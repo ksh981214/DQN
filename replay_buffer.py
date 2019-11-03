@@ -10,7 +10,7 @@ class ReplayBuffer(object):
         
         self.next_idx = 0
         self.num_in_buffer = 0
-        self.states = np.empty([self.buffer_size] + self.state_shape, dtype=np.float32)
+        self.states = np.empty([self.buffer_size] + self.state_shape, dtype=np.uint8)
         self.actions = np.empty([self.buffer_size], dtype=np.int32)
         self.rewards = np.empty([self.buffer_size], dtype=np.float32)
         self.dones = np.empty([self.buffer_size], dtype=np.bool)
@@ -50,11 +50,12 @@ class ReplayBuffer(object):
         
         rands_add_1 = np.add(rands,1)    
         
-        
-        state = self.states[rands]
+        #print("스케일 전:", self.states[rands])
+        state = np.array(self.states[rands]/255.0, dtype=np.float32)
+        #print("스케일 후: ",state)
         action = self.actions[rands]
         reward = self.rewards[rands]
-        state_after = self.states[rands_add_1]
+        state_after = np.array(self.states[rands_add_1]/255.0, dtype=np.float32)
         done = np.array([1.0 if self.dones[num] else 0.0 for num in rands],dtype=np.float32)
         
         return state,action,reward,state_after,done

@@ -1,8 +1,9 @@
+from config import config
 class e_scheduler():
     
     Initial_e = 1
     Final_e = 0.1
-    FINAL_EXPLORATION_STEPS = 1000000 #2015 Atari_DQN, if EP_STEP == 1000000,. e = 0.1
+    FINAL_EXPLORATION_STEPS = 500000 #2015 Atari_DQN, if EP_STEP == 1000000,. e = 0.1
     
     
     def __init__(self):
@@ -19,12 +20,10 @@ class e_scheduler():
     
 #NOT USING
 class lr_scheduler():
-    MAX_TIME_STEPS = 5000000
-    REPLAY_START_SIZE = 50000
     
     lr_begin           = 0.00025
     lr_end             = 0.00005
-    lr_nsteps          = MAX_TIME_STEPS/2
+    lr_nsteps          = config.MAX_TIME_STEPS/2
     
    
     

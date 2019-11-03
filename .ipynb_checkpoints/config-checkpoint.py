@@ -3,7 +3,7 @@ class config():
     #game_name = "Pong-v0"
     game_name="PongNoFrameskip-v4"
     preprocess = True #'Preprocess atari environments to 84*84 frames'
-    scale = True # 'Scale observations into [0,1]'
+    scale = False # 'Scale observations into [0,1]'
     episode_life = True # 'Make end-of-life == end-of-episode'
     clip_rewards = True # 'Bin rewards to [-1, 0, +1] by its sign'
     no_op_reset = True # 'Sample initial states by taking random number of no-ops on reset'
@@ -21,7 +21,7 @@ class config():
     #main
     skip_frame=4
     MAX_TIME_STEPS = 2500000
-    REPLAY_START_SIZE = 50000
+    REPLAY_START_SIZE = 10000
     
     target_UPDATE_FREQ = 10000
     LEARNING_FREQ = 4

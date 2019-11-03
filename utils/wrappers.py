@@ -98,6 +98,8 @@
 
 #         else:
 #             super(PongWrapper, self)._render(mode, close)
+            
+
 
 import numpy as np
 import os
