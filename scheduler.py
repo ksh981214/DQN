@@ -3,7 +3,7 @@ class e_scheduler():
     
     Initial_e = 1
     Final_e = 0.1
-    FINAL_EXPLORATION_STEPS = 500000 #2015 Atari_DQN, if EP_STEP == 1000000,. e = 0.1
+    FINAL_EXPLORATION_STEPS = config.MAX_TIME_STEPS/5 #2015 Atari_DQN, if EP_STEP == 1000000,. e = 0.1
     
     
     def __init__(self):

@@ -29,6 +29,15 @@ class DQNAgent(object):
         self.build_target_network()
         self.build_training()
         
+        pred_vars = tf.get_collection(
+        tf.GraphKeys.GLOBAL_VARIABLES, scope ='pred_network')
+#           target_vars = tf.get_collection(
+#           tf.GraphKeys.TRAINABLE_VARIABLES, scope = 'target_network')
+        target_vars = tf.get_collection(
+        tf.GraphKeys.GLOBAL_VARIABLES, scope = 'target_network')
+    
+        self.update_fn = tf.group(*[tf.assign(target_vars[i], pred_vars[i]) for i in range(len(target_vars))])
+        
     def build_prediction_network(self):
         with tf.variable_scope('pred_network'):
             self.state = tf.placeholder(dtype = tf.float32, shape=(None, self.width, self.height, 1 * self.history_length), name = 'state')
@@ -62,7 +71,7 @@ class DQNAgent(object):
             #self.Q_action = tf.argmax(self.Q, dimension = 1)
     def build_target_network(self):
         with tf.variable_scope('target_network'):
-            self.target_state = tf.placeholder(dtype = tf.float32, shape=(None, self.width, self.height, 1 * self.history_length), name = 'state')
+            self.target_state = tf.placeholder(dtype = tf.float32, shape=(None, self.width, self.height, 1 * self.history_length), name = 'target_state')
             
             model = layers.conv2d(inputs = self.target_state,
                                     num_outputs = 32,
@@ -92,20 +101,22 @@ class DQNAgent(object):
                                              activation_fn = None, scope='Q_values')
             
                 
-    def update_target_network(self):
-        #pred_vars = tf.get_collection(
-        #    tf.GraphKeys.TRAINABLE_VARIABLES, scope ='pred_network')
-        pred_vars = tf.get_collection(
-        tf.GraphKeys.GLOBAL_VARIABLES, scope ='pred_network')
-#           target_vars = tf.get_collection(
-#           tf.GraphKeys.TRAINABLE_VARIABLES, scope = 'target_network')
-        target_vars = tf.get_collection(
-        tf.GraphKeys.GLOBAL_VARIABLES, scope = 'target_network')
+#     def update_target_network(self):
+#         #pred_vars = tf.get_collection(
+#         #    tf.GraphKeys.TRAINABLE_VARIABLES, scope ='pred_network')
+#         pred_vars = tf.get_collection(
+#         tf.GraphKeys.GLOBAL_VARIABLES, scope ='pred_network')
+# #           target_vars = tf.get_collection(
+# #           tf.GraphKeys.TRAINABLE_VARIABLES, scope = 'target_network')
+#         target_vars = tf.get_collection(
+#         tf.GraphKeys.GLOBAL_VARIABLES, scope = 'target_network')
+    
+#         self.update_fn = tf.group(*[tf.assign(target_vars[i], pred_vars[i]) for i in range(len(target_vars))])
 
-        #move the all param from main to tgt
-        for pred_var, target_var in zip(pred_vars, target_vars):
-            weight_input = tf.placeholder(dtype = tf.float32, name='weight' )
-            target_var.assign(weight_input).eval({weight_input: pred_var.eval(session = self.sess)}, session = self.sess)
+# #         #move the all param from main to tgt
+# #         for pred_var, target_var in zip(pred_vars, target_vars):
+# #             weight_input = tf.placeholder(dtype = tf.float32, name='weight' )
+# #             target_var.assign(weight_input).eval({weight_input: pred_var.eval(session = self.sess)}, session = self.sess)
                 
     def build_training(self):
             
@@ -135,15 +146,15 @@ class DQNAgent(object):
         return action
     
     def process_state_into_stacked_frames(self, frame, past_frames, past_state=None):
-        full_state = np.zeros((self.width,self.height,self.history_length), dtype=np.uint8) #84 x 84 x 4
+        #full_state = np.zeros((self.width,self.height,self.history_length), dtype=np.uint8) #84 x 84 x 4
         
         if past_state is not None:
-            for i in range(past_state.shape[2]-1):
-                #그 전의 과거를 앞으로 한 칸씩 당겨오고 
-                full_state[:,:,i] = past_state[:,:,i+1]
-            #현재 들어온 프레임을 맨 뒤에 삽입
-            full_state[:,:,-1] = np.squeeze(frame)
-            
+#             for i in range(past_state.shape[2]-1):
+#                 #그 전의 과거를 앞으로 한 칸씩 당겨오고 
+#                 full_state[:,:,i] = past_state[:,:,i+1]
+#             #현재 들어온 프레임을 맨 뒤에 삽입
+#             full_state[:,:,-1] = np.squeeze(frame)
+            full_state = np.concatenate((past_state, frame), axis=2)[:,:,1:]
             
                 
         else:  #None
@@ -171,7 +182,7 @@ def main(argv):
     agent = DQNAgent(sess=sess, num_actions=num_actions)
     
     sess.run(tf.global_variables_initializer())
-    agent.update_target_network()
+    #agent.update_target_network()
     '''
     episode 10번에 한 번씩 로그를 저장, 그 때 rewards의 평균을 저장
     그런 다음 학습 결과를 저장하기 위해 tf.train.Saver와 텐서플로 세션, 그리고 로그를 저장하기 위한
@@ -257,7 +268,10 @@ def main(argv):
 
                 b_state, b_action, b_reward, b_state_after, b_done = replay_buffer.sample_batch(config.BATCH_SIZE)
                 
-                Q_of_state_after = agent.target_Q.eval(feed_dict={agent.target_state: b_state_after}, session = agent.sess)
+                #Q_of_state_after = agent.target_Q.eval(feed_dict={agent.target_state: b_state_after}, session = agent.sess)
+                
+                Q_of_state_after = agent.sess.run(agent.target_Q,
+                                                 feed_dict={agent.target_state: b_state_after})
                 
                 target_Q_p = []
                 for i in range(config.BATCH_SIZE):
@@ -274,7 +288,8 @@ def main(argv):
                 })
                 
             if time_step % config.target_UPDATE_FREQ == 0:
-                agent.update_target_network()
+                #agent.update_target_network()
+                agent.sess.run(agent.update_fn)
                 
             if time_step % config.REWARD_RECORD_FREQ == 0 and len(total_reward_list) != 0:
                 #print("로그를 저장합니다.")
