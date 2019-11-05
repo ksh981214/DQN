@@ -42,81 +42,65 @@ class DQNAgent(object):
         with tf.variable_scope('pred_network'):
             self.state = tf.placeholder(dtype = tf.float32, shape=(None, self.width, self.height, 1 * self.history_length), name = 'state')
             
-            model = layers.conv2d(inputs = self.state,
+            self.conv1 = layers.conv2d(inputs = self.state,
                                     num_outputs = 32,
                                     activation_fn = tf.nn.relu,
                                     stride = 4,
                                     kernel_size = 8,
                                     padding = 'VALID')
-            model = layers.conv2d(inputs = model,
+            self.conv2 = layers.conv2d(inputs = self.conv1,
                                     num_outputs = 64,
                                     activation_fn = tf.nn.relu,
                                     stride = 2,
                                     kernel_size = 4,
                                     padding = 'VALID')
-            model = layers.conv2d(inputs = model,
+            self.conv3 = layers.conv2d(inputs = self.conv2,
                                     num_outputs = 64,
                                     activation_fn = tf.nn.relu,
                                     stride = 1,
                                     kernel_size = 3,
                                     padding = 'VALID')
             
-            model = layers.flatten(model)
-            model = layers.fully_connected(inputs = model,
+            self.fc1 = layers.flatten(self.conv3)
+            self.fc2 = layers.fully_connected(inputs = self.fc1,
                                              num_outputs = 512,
                                              activation_fn = tf.nn.relu)                
-            self.Q = layers.fully_connected(inputs = model,
+            self.Q = layers.fully_connected(inputs = self.fc2,
                                                  num_outputs = self.num_actions,
-                                                 activation_fn = None, scope='Q_values')
+                                                 activation_fn = None)
             #self.Q_action = tf.argmax(self.Q, dimension = 1)
     def build_target_network(self):
         with tf.variable_scope('target_network'):
             self.target_state = tf.placeholder(dtype = tf.float32, shape=(None, self.width, self.height, 1 * self.history_length), name = 'target_state')
             
-            model = layers.conv2d(inputs = self.target_state,
+            self.t_conv1 = layers.conv2d(inputs = self.target_state,
                                     num_outputs = 32,
                                     activation_fn = tf.nn.relu,
                                     stride = 4,
                                     kernel_size = 8,
                                     padding = 'VALID')
-            model = layers.conv2d(inputs = model,
+            self.t_conv2 = layers.conv2d(inputs = self.t_conv1,
                                     num_outputs = 64,
                                     activation_fn = tf.nn.relu,
                                     stride = 2,
                                     kernel_size = 4,
                                     padding = 'VALID')
-            model = layers.conv2d(inputs = model,
+            self.t_conv3 = layers.conv2d(inputs = self.t_conv2,
                                     num_outputs = 64,
                                     activation_fn = tf.nn.relu,
                                     stride = 1,
                                     kernel_size = 3,
                                     padding = 'VALID')
             
-            model = layers.flatten(model)
-            model = layers.fully_connected(inputs = model,
+            self.t_fc1 = layers.flatten(self.t_conv3)
+            self.t_fc2 = layers.fully_connected(inputs = self.t_fc1,
                                              num_outputs = 512,
                                              activation_fn = tf.nn.relu)
-            self.target_Q = layers.fully_connected(inputs = model,
+            self.target_Q = layers.fully_connected(inputs = self.t_fc2,
                                              num_outputs = self.num_actions,
-                                             activation_fn = None, scope='Q_values')
+                                             activation_fn = None)
             
-                
-#     def update_target_network(self):
-#         #pred_vars = tf.get_collection(
-#         #    tf.GraphKeys.TRAINABLE_VARIABLES, scope ='pred_network')
-#         pred_vars = tf.get_collection(
-#         tf.GraphKeys.GLOBAL_VARIABLES, scope ='pred_network')
-# #           target_vars = tf.get_collection(
-# #           tf.GraphKeys.TRAINABLE_VARIABLES, scope = 'target_network')
-#         target_vars = tf.get_collection(
-#         tf.GraphKeys.GLOBAL_VARIABLES, scope = 'target_network')
-    
-#         self.update_fn = tf.group(*[tf.assign(target_vars[i], pred_vars[i]) for i in range(len(target_vars))])
-
-# #         #move the all param from main to tgt
-# #         for pred_var, target_var in zip(pred_vars, target_vars):
-# #             weight_input = tf.placeholder(dtype = tf.float32, name='weight' )
-# #             target_var.assign(weight_input).eval({weight_input: pred_var.eval(session = self.sess)}, session = self.sess)
+            
                 
     def build_training(self):
             
@@ -131,10 +115,11 @@ class DQNAgent(object):
         self.loss = tf.reduce_mean(tf.where(tf.abs(self.delta)<1.0,tf.square(self.delta)*0.5, tf.abs(self.delta)-0.5), name='loss')
         #self.loss = tf.reduce_mean(tf.where(tf.abs(self.delta)<1.0,self.delta, tf.sign(self.delta)), name='loss')
         self.optimizer = tf.train.AdamOptimizer(learning_rate=self.lr)
-        opt = self.optimizer
-        opt = tf.contrib.estimator.clip_gradients_by_norm(opt,10.0)
+        
         
         self.train_step = self.optimizer.minimize(self.loss)
+        
+        #return self.loss
         
     def predict_action(self, state):
         action_distribution = self.sess.run(
@@ -163,6 +148,8 @@ class DQNAgent(object):
             #full_state = full_state.astype('uint8')
         
         return full_state
+    
+
         
         
 
@@ -192,8 +179,9 @@ def main(argv):
     
     saver = tf.train.Saver()
     tf.summary.scalar('avg.reward/ep', tf.reduce_mean(rewards))
+    tf.summary.scalar('max.reward/ep', tf.reduce_max(rewards))
     
-    writer = tf.summary.FileWriter('logs_4', sess.graph)
+    writer = tf.summary.FileWriter('logs_5', sess.graph)
     summary_merged = tf.summary.merge_all()
     
     episode_rewards = [] #에피소드당 리워드 저장
@@ -230,7 +218,7 @@ def main(argv):
         
         while not done:
             
-            if np.random.rand() < e.get() :
+            if np.random.rand() < e.get() or time_step < config.REPLAY_START_SIZE:
                 action = env.action_space.sample()
             else:
                 action = agent.predict_action(state_scale)
@@ -272,7 +260,7 @@ def main(argv):
                 
                 Q_of_state_after = agent.sess.run(agent.target_Q,
                                                  feed_dict={agent.target_state: b_state_after})
-                
+                #print("Qofstateafter: ",Q_of_state_after)
                 target_Q_p = []
                 for i in range(config.BATCH_SIZE):
                     if b_done[i]:
@@ -286,6 +274,8 @@ def main(argv):
                     agent.state: b_state,
                     agent.lr: lr.get()
                 })
+                opt = agent.optimizer
+                opt = tf.contrib.estimator.clip_gradients_by_norm(opt,10.0)
                 
             if time_step % config.target_UPDATE_FREQ == 0:
                 #agent.update_target_network()
