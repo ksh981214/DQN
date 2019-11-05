@@ -1,6 +1,6 @@
-model_checkpoint_path: "dqn.ckpt-800000"
-all_model_checkpoint_paths: "dqn.ckpt-400000"
+model_checkpoint_path: "dqn.ckpt-900000"
 all_model_checkpoint_paths: "dqn.ckpt-500000"
 all_model_checkpoint_paths: "dqn.ckpt-600000"
 all_model_checkpoint_paths: "dqn.ckpt-700000"
 all_model_checkpoint_paths: "dqn.ckpt-800000"
+all_model_checkpoint_paths: "dqn.ckpt-900000"
