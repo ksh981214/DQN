@@ -8,7 +8,7 @@ import numpy as np
 
 #main
 from utils.preprocess import greyscale
-#from utils.wrappers import PreproWrapper, MaxAndSkipEnv
+#from utils.wrappers import NoopResetEnv,FireResetEnv,EpisodicLifeEnv,PreproWrapper, MaxAndSkipEnv, ClipRewardEnv
 from utils.wrappers import wrap_deepmind
 from replay_buffer import ReplayBuffer
 from scheduler import e_scheduler
@@ -101,7 +101,6 @@ class DQNAgent(object):
                                              activation_fn = None)
             
             
-                
     def build_training(self):
             
         self.target_Q_p = tf.placeholder(dtype = tf.float32, shape=(None), name='target_Q_p')
@@ -115,7 +114,7 @@ class DQNAgent(object):
         self.loss = tf.reduce_mean(tf.where(tf.abs(self.delta)<1.0,tf.square(self.delta)*0.5, tf.abs(self.delta)-0.5), name='loss')
         #self.loss = tf.reduce_mean(tf.where(tf.abs(self.delta)<1.0,self.delta, tf.sign(self.delta)), name='loss')
         self.optimizer = tf.train.AdamOptimizer(learning_rate=self.lr)
-        
+        self.optimizer = tf.contrib.estimator.clip_gradients_by_norm(self.optimizer,10.0)
         
         self.train_step = self.optimizer.minimize(self.loss)
         
@@ -156,8 +155,12 @@ class DQNAgent(object):
 def main(argv):
     
     env = gym.make(config.game_name)
+    #env = EpisodicLifeEnv(env)
+    #env = FireResetEnv(env)
+    #env = NoopResetEnv(env)
     #env = MaxAndSkipEnv(env, skip=config.skip_frame)
-    #env = PreproWrapper(env, prepro=greyscale, shape=(80, 80, 1),overwrite_render=True)
+    #env = PreproWrapper(env, prepro=greyscale, shape=config.observation_dims,overwrite_render=True)
+    #env = ClipRewardEnv(env)
     env = wrap_deepmind(env, config.episode_life, config.preprocess, config.max_and_skip,config.clip_rewards, config.no_op_reset, config.scale)
     
     num_actions=env.action_space.n
@@ -181,7 +184,7 @@ def main(argv):
     tf.summary.scalar('avg.reward/ep', tf.reduce_mean(rewards))
     tf.summary.scalar('max.reward/ep', tf.reduce_max(rewards))
     
-    writer = tf.summary.FileWriter('logs_5', sess.graph)
+    writer = tf.summary.FileWriter('logs_9', sess.graph)
     summary_merged = tf.summary.merge_all()
     
     episode_rewards = [] #에피소드당 리워드 저장
@@ -202,8 +205,11 @@ def main(argv):
         total_reward = 0 
         
         frame = env.reset() #한 순간의 화면 (쌓이기 전) 84 x 84 x 1 , np.array
+        #print(frame)
         
-        frame_scale = np.array(frame / 255.0, dtype=np.float32)
+        #frame_scale = np.array(frame / 255.0, dtype=np.float32)
+        frame_scale = np.array(frame).astype(np.float32) / 255.0
+        #print(frame_scale)
         #print(frame)
         #print(frame_scale)
         #맨 처음 frame을 받아올때는 past_frames이 존재하지않으므로, (80x80)의 0인 행렬을 받아서 초기화
@@ -213,8 +219,9 @@ def main(argv):
 
         #state --> history length만큼 쌓임
         state = agent.process_state_into_stacked_frames(frame, past_frames, past_state=None) #저장용
-        #state_scale = agent.process_state_into_stacked_frames(frame_scale, past_frames_scale, past_state=None) #학습용
-        state_scale = np.array(state / 255.0,dtype=np.float32)
+        
+        #state_scale = np.array(state / 255.0,dtype=np.float32)
+        state_scale = np.array(state).astype(np.float32) / 255.0
         
         while not done:
             
@@ -226,7 +233,10 @@ def main(argv):
             
             frame_after, reward, done, info = env.step(action)
             #print("frame_after: ",frame_after)
-            frame_after_scale = np.array(frame_after / 255.0, dtype=np.float32)
+            
+            #frame_after_scale = np.array(frame_after / 255.0, dtype=np.float32)
+            frame_after_scale = np.array(frame_after).astype(np.float32) / 255.0
+            
             #print("frame_after_scale: ",frame_after_scale)
             replay_buffer.add_experience(state, action, reward, done)
 
@@ -235,13 +245,15 @@ def main(argv):
                 #새로 생긴 frame을 과거 state에 더해줌.
                 state_after = agent.process_state_into_stacked_frames(frame_after, past_frames, past_state = state)
                 #state_after_scale = agent.process_state_into_stacked_frames(frame_after_scale, past_frames_scale, past_state = state_scale)
-                state_after_scale = np.array(state_after / 255.0, dtype=np.float32)
-                #past_frames.append(frame_after) #이제 history length만큼 됨.
+                
+                #state_after_scale = np.array(state_after / 255.0, dtype=np.float32)
+                state_after_scale = np.array(state_after).astype(np.float32) / 255.0
                 
                 past_frames = np.concatenate((past_frames, frame_after), axis=2)
                 past_frames = past_frames[:,:,1:]
                 
-                past_frames_scale = np.array(past_frames / 255.0, dtype=np.float32)
+                #past_frames_scale = np.array(past_frames / 255.0, dtype=np.float32)
+                past_frames_scale = np.array(past_frames).astype(np.float32) / 255.0
                 
                 #print(past_frames.shape)
                 state = state_after
@@ -255,6 +267,9 @@ def main(argv):
                 lr.update(time_step)
 
                 b_state, b_action, b_reward, b_state_after, b_done = replay_buffer.sample_batch(config.BATCH_SIZE)
+                
+                #print(b_state[0])
+                #print(b_reward)
                 
                 #Q_of_state_after = agent.target_Q.eval(feed_dict={agent.target_state: b_state_after}, session = agent.sess)
                 
@@ -274,8 +289,7 @@ def main(argv):
                     agent.state: b_state,
                     agent.lr: lr.get()
                 })
-                opt = agent.optimizer
-                opt = tf.contrib.estimator.clip_gradients_by_norm(opt,10.0)
+                
                 
             if time_step % config.target_UPDATE_FREQ == 0:
                 #agent.update_target_network()
@@ -289,7 +303,7 @@ def main(argv):
                 total_reward_list =[]
         
             if time_step % config.MODEL_RECORD_FREQ == 0:
-                saver.save(sess, 'model_4/dqn.ckpt', global_step = time_step)
+                saver.save(sess, 'model_9/dqn.ckpt', global_step = time_step)
         
         
         #학습과 상관 x
