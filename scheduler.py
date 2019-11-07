@@ -2,7 +2,7 @@ from config import config
 class e_scheduler():
     
     Initial_e = 1
-    Final_e = 0.1
+    Final_e = 0.01
     FINAL_EXPLORATION_STEPS = config.MAX_TIME_STEPS/5 #2015 Atari_DQN, if EP_STEP == 1000000,. e = 0.1
     
     
@@ -17,8 +17,7 @@ class e_scheduler():
         
     def get(self):
         return self.e
-    
-#NOT USING
+
 class lr_scheduler():
     
     lr_begin           = 0.00025
@@ -35,4 +34,5 @@ class lr_scheduler():
         else:
             self.lr = self.lr_begin - (((self.lr_begin - self.lr_end) / self.lr_nsteps) * time_step)
     def get(self):
-        return self.lr
+        return self.lr_begin
+        #return self.lr
