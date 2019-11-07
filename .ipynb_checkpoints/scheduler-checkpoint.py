@@ -34,5 +34,5 @@ class lr_scheduler():
         else:
             self.lr = self.lr_begin - (((self.lr_begin - self.lr_end) / self.lr_nsteps) * time_step)
     def get(self):
-        return self.lr_begin
+        return self.lr_begin #constant lr
         #return self.lr
