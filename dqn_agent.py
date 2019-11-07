@@ -184,7 +184,11 @@ def main(argv):
     tf.summary.scalar('avg.reward/ep', tf.reduce_mean(rewards))
     tf.summary.scalar('max.reward/ep', tf.reduce_max(rewards))
     
+<<<<<<< HEAD
     writer = tf.summary.FileWriter('logs_12_v4_allwrap_constant_lr', sess.graph)
+=======
+    writer = tf.summary.FileWriter('logs_9', sess.graph)
+>>>>>>> 504486b6aca9a087a5daf7ebbc8a30eae4c3de69
     summary_merged = tf.summary.merge_all()
     
     episode_rewards = [] #에피소드당 리워드 저장
@@ -303,7 +307,11 @@ def main(argv):
                 total_reward_list =[]
         
             if time_step % config.MODEL_RECORD_FREQ == 0:
+<<<<<<< HEAD
                 saver.save(sess, 'model_12_v4_allwrap_constant_lr/dqn.ckpt', global_step = time_step)
+=======
+                saver.save(sess, 'model_9/dqn.ckpt', global_step = time_step)
+>>>>>>> 504486b6aca9a087a5daf7ebbc8a30eae4c3de69
         
         
         #학습과 상관 x

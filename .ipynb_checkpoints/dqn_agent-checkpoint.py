@@ -123,13 +123,15 @@ class DQNAgent(object):
     def predict_action(self, state):
         action_distribution = self.sess.run(
         self.Q, feed_dict={self.state:[state]})[0]
+        #print(action_distribution.shape)
         #print(action_distribution)
         #print("action_dist",action_distribution)
         action = np.argmax(action_distribution)
-        
+        #print(action)
         return action
     
     def process_state_into_stacked_frames(self, frame, past_frames, past_state=None):
+<<<<<<< HEAD
         #full_state = np.zeros((self.width,self.height,self.history_length), dtype=np.uint8) #84 x 84 x 4
         
         if past_state is not None:
@@ -139,6 +141,22 @@ class DQNAgent(object):
 #             #현재 들어온 프레임을 맨 뒤에 삽입
 #             full_state[:,:,-1] = np.squeeze(frame)
             full_state = np.concatenate((past_state, frame), axis=2)[:,:,1:]
+=======
+        
+        if past_state is not None:
+            #full_state = np.zeros((self.width,self.height,self.history_length), dtype=np.uint8) #84 x 84 x 4
+            
+            full_state = np.concatenate((past_state, frame),axis=2)[:,:,1:]
+            #print(full_state.shape)
+            #full_state = full_state[:,:,1:]
+            #print(full_state.shape)
+            #for i in range(past_state.shape[2]-1):
+            #    #그 전의 과거를 앞으로 한 칸씩 당겨오고 
+            #    full_state[:,:,i] = past_state[:,:,i+1]
+            ##현재 들어온 프레임을 맨 뒤에 삽입
+            #full_state[:,:,-1] = np.squeeze(frame)
+            
+>>>>>>> 504486b6aca9a087a5daf7ebbc8a30eae4c3de69
             
                 
         else:  #None
@@ -208,8 +226,12 @@ def main(argv):
         #print(frame)
         
         #frame_scale = np.array(frame / 255.0, dtype=np.float32)
+<<<<<<< HEAD
         frame_scale = np.array(frame).astype(np.float32) / 255.0
         #print(frame_scale)
+=======
+        frame_scale = frame.astype(np.float32) / 255.0
+>>>>>>> 504486b6aca9a087a5daf7ebbc8a30eae4c3de69
         #print(frame)
         #print(frame_scale)
         #맨 처음 frame을 받아올때는 past_frames이 존재하지않으므로, (80x80)의 0인 행렬을 받아서 초기화
@@ -219,6 +241,7 @@ def main(argv):
 
         #state --> history length만큼 쌓임
         state = agent.process_state_into_stacked_frames(frame, past_frames, past_state=None) #저장용
+<<<<<<< HEAD
         
         #state_scale = np.array(state / 255.0,dtype=np.float32)
         state_scale = np.array(state).astype(np.float32) / 255.0
@@ -226,34 +249,75 @@ def main(argv):
         while not done:
             
             if np.random.rand() < e.get() or time_step < config.REPLAY_START_SIZE:
+=======
+        #state_scale = agent.process_state_into_stacked_frames(frame_scale, past_frames_scale, past_state=None) #학습용
+        #state_scale = np.array(state / 255.0,dtype=np.float32)
+        state_scale = state.astype(np.float32) / 255.0
+        while not done:
+            
+            if np.random.rand() < e.get() :
+                #print("random!")
+>>>>>>> 504486b6aca9a087a5daf7ebbc8a30eae4c3de69
                 action = env.action_space.sample()
             else:
+                #print("action!")
                 action = agent.predict_action(state_scale)
             time_step += 1
             
             frame_after, reward, done, info = env.step(action)
             #print("frame_after: ",frame_after)
+<<<<<<< HEAD
             
             #frame_after_scale = np.array(frame_after / 255.0, dtype=np.float32)
             frame_after_scale = np.array(frame_after).astype(np.float32) / 255.0
             
+=======
+            #print(frame_after.shape, frame_after.dtype)
+            
+            #frame_after_scale = np.array(frame_after / 255.0, dtype=np.float32)
+            frame_after_scale = frame_after.astype(np.float32) / 255.0
+            
+            
+            #print(frame_after_scale)
+            #print(frame_after_scale.shape, frame_after_scale.dtype)
+>>>>>>> 504486b6aca9a087a5daf7ebbc8a30eae4c3de69
             #print("frame_after_scale: ",frame_after_scale)
             replay_buffer.add_experience(state, action, reward, done)
-
+            
+#             if done :
+#                 print(reward)
+#                 print(total_reward)
+#                 print(done)
             if not done: #+21 or -21
 
                 #새로 생긴 frame을 과거 state에 더해줌.
                 state_after = agent.process_state_into_stacked_frames(frame_after, past_frames, past_state = state)
                 #state_after_scale = agent.process_state_into_stacked_frames(frame_after_scale, past_frames_scale, past_state = state_scale)
+<<<<<<< HEAD
                 
                 #state_after_scale = np.array(state_after / 255.0, dtype=np.float32)
                 state_after_scale = np.array(state_after).astype(np.float32) / 255.0
+=======
+                #state_after_scale = np.array(state_after / 255.0, dtype=np.float32)
+                state_after_scale = state_after.astype(np.float32) / 255.0
+                
+                #past_frames.append(frame_after) #이제 history length만큼 됨.
+>>>>>>> 504486b6aca9a087a5daf7ebbc8a30eae4c3de69
                 
                 past_frames = np.concatenate((past_frames, frame_after), axis=2)
                 past_frames = past_frames[:,:,1:]
+                #print(past_frames.shape)
+                #print(past_frames)
+                
                 
                 #past_frames_scale = np.array(past_frames / 255.0, dtype=np.float32)
+                past_frames_scale = past_frames.astype(np.float32) / 255.0
+                
+<<<<<<< HEAD
+                #past_frames_scale = np.array(past_frames / 255.0, dtype=np.float32)
                 past_frames_scale = np.array(past_frames).astype(np.float32) / 255.0
+=======
+>>>>>>> 504486b6aca9a087a5daf7ebbc8a30eae4c3de69
                 
                 #print(past_frames.shape)
                 state = state_after
@@ -273,16 +337,24 @@ def main(argv):
                 
                 #Q_of_state_after = agent.target_Q.eval(feed_dict={agent.target_state: b_state_after}, session = agent.sess)
                 
+<<<<<<< HEAD
                 Q_of_state_after = agent.sess.run(agent.target_Q,
                                                  feed_dict={agent.target_state: b_state_after})
                 #print("Qofstateafter: ",Q_of_state_after)
+=======
+                #print(Q_of_state_after.shape) #(32,6)
+                
+                
+>>>>>>> 504486b6aca9a087a5daf7ebbc8a30eae4c3de69
                 target_Q_p = []
                 for i in range(config.BATCH_SIZE):
                     if b_done[i]:
                         target_Q_p.append(b_reward[i])
                     else:
                         target_Q_p.append(b_reward[i] + config.DISCOUNT_FACTOR * np.max(Q_of_state_after[i]))
-                        
+                #print(target_Q_p)
+                
+                
                 agent.sess.run([agent.train_step, agent.Q, agent.loss], {
                     agent.target_Q_p : target_Q_p,
                     agent.action: b_action,

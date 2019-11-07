@@ -47,12 +47,20 @@ class ReplayBuffer(object):
         
         #print("스케일 전:", self.states[rands])
         #state = np.array(self.states[rands]/255.0, dtype=np.float32)
+<<<<<<< HEAD
         state = np.array(self.states[rands]).astype(np.float32) / 255.0
+=======
+        state = self.states[rands].astype(np.float32) /255.0
+>>>>>>> 504486b6aca9a087a5daf7ebbc8a30eae4c3de69
         #print("스케일 후: ",state)
         action = self.actions[rands]
         reward = self.rewards[rands]
         #state_after = np.array(self.states[rands_add_1]/255.0, dtype=np.float32)
+<<<<<<< HEAD
         state_after = np.array(self.states[rands_add_1]).astype(np.float32) / 255.0
+=======
+        state_after = self.states[rands_add_1].astype(np.float32) /255.0
+>>>>>>> 504486b6aca9a087a5daf7ebbc8a30eae4c3de69
         done = np.array([1.0 if self.dones[num] else 0.0 for num in rands],dtype=np.float32)
         
         return state,action,reward,state_after,done
